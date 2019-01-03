@@ -344,8 +344,9 @@ export class Placement {
                     const anchors = dynamicAnchors[0] === "auto" ? AUTO_DYNAMIC_PLACEMENT : dynamicAnchors;
                     for (const anchor of anchors) {
                         // Skip center placement on auto mode if there is an icon for this feature
-                        if (collisionArrays.iconBox && dynamicAnchors[0] === "auto" && anchor === "center") continue;
-                        // Auto is not valid as any but the first element of the `dynamic-placmene`
+                        if (collisionArrays.iconBox && dynamicAnchors[0] === "auto" && anchor === "center") {
+                            continue;
+                        }
                         if (anchor === "auto") {
                             warnOnce("Auto is not valid as any but the first element of the `dynamic-text-anchor` array.");
                             continue;

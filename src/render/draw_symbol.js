@@ -160,16 +160,16 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
                     // so we don't need to do the extra math to figure out what incremental shift to apply.
                     symbolProjection.hideGlyphs(symbol.numGlyphs, dynamicLayoutVertexArray);
                 } else  {
-                    const renderTextSize = symbolSize.evaluateSizeForFeature(bucket.textSizeData, size, symbol);
                     // 24 is the magic number used to scale all sdfs – here we are basically calculating the textBoxScale for the
                     // label at the rendered size instead of the layout size we use for placement
-                    const renderTimeTextScale = renderTextSize * bucket.tilePixelRatio / 24;
-                    // scale dynamic anchor offsets by the appropriate glyph size and the current fractional zoom level
-                    const shiftX = (symbol.shiftX * renderTimeTextScale) / Math.pow(2, painter.transform.zoom - tile.tileID.overscaledZ);
-                    const shiftY = (symbol.shiftY * renderTimeTextScale) / Math.pow(2, painter.transform.zoom - tile.tileID.overscaledZ);
-                    const anchor = new Point(symbol.anchorX + shiftX, symbol.anchorY + shiftY);
+                    const renderTextSize = symbolSize.evaluateSizeForFeature(bucket.textSizeData, size, symbol) / 24;
+                    // We project the anchor from tile coordinates to the label plane, then add an
+                    // offset based on the label size and anchor position
+                    const projectedAnchor = symbolProjection.project(
+                        new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix).point.add(
+                            new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize));
                     for (let g = 0; g < symbol.numGlyphs; g++) {
-                        addDynamicAttributes(dynamicLayoutVertexArray, anchor, 0);
+                        addDynamicAttributes(dynamicLayoutVertexArray, projectedAnchor, 0);
                     }
                 }
             }
@@ -177,7 +177,7 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
         }
 
         const matrix = painter.translatePosMatrix(coord.posMatrix, tile, translate, translateAnchor),
-            uLabelPlaneMatrix = alongLine ? identityMat4 : labelPlaneMatrix,
+            uLabelPlaneMatrix = (alongLine || (isText && dynamicPlacement)) ? identityMat4 : labelPlaneMatrix,
             uglCoordMatrix = painter.translatePosMatrix(glCoordMatrix, tile, translate, translateAnchor, true);
 
         const hasHalo = isSDF && layer.paint.get(isText ? 'text-halo-width' : 'icon-halo-width').constantOr(1) !== 0;
@@ -252,4 +252,3 @@ function drawSymbolElements(buffers, segments, layer, painter, program, depthMod
         painter.transform.zoom, buffers.programConfigurations.get(layer.id),
         buffers.dynamicLayoutVertexBuffer, buffers.opacityVertexBuffer);
 }
-
