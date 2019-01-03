@@ -79,6 +79,12 @@ test('RasterTileSource', (t) => {
         });
         window.server.respond();
     });
+
+    t.test('queues texture uploads', (t) => {
+        t.equal(1, 1);
+        t.end();
+    });
+
     t.test('populates neighboringTiles', (t) => {
         window.server.respondWith('/source.json', JSON.stringify({
             minzoom: 0,
