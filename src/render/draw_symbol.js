@@ -165,9 +165,22 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
                     const renderTextSize = symbolSize.evaluateSizeForFeature(bucket.textSizeData, size, symbol) / 24;
                     // We project the anchor from tile coordinates to the label plane, then add an
                     // offset based on the label size and anchor position
-                    const projectedAnchor = symbolProjection.project(
-                        new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix).point.add(
-                            new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize));
+                    let projectedAnchor;
+                    if (pitchWithMap) {
+                        projectedAnchor = symbolProjection.project(
+                            new Point(symbol.anchorX, symbol.anchorY).add(
+                                new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize)
+                                ), labelPlaneMatrix).point;
+                    } else if (rotateWithMap) {
+                        projectedAnchor = symbolProjection.project(
+                            new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix).point.add(
+                                new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize)
+                                    .rotate(-painter.transform.angle));
+                    } else {
+                        projectedAnchor = symbolProjection.project(
+                            new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix).point.add(
+                                new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize));
+                    }
                     for (let g = 0; g < symbol.numGlyphs; g++) {
                         addDynamicAttributes(dynamicLayoutVertexArray, projectedAnchor, 0);
                     }

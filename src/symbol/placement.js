@@ -10,6 +10,7 @@ import symbolLayerProperties from '../style/style_layer/symbol_style_layer_prope
 import assert from 'assert';
 import pixelsToTileUnits from '../source/pixels_to_tile_units';
 import {warnOnce} from '../util/util';
+import Point from '@mapbox/point-geometry';
 import type Transform from '../geo/transform';
 import type StyleLayer from '../style/style_layer';
 
@@ -66,14 +67,18 @@ class JointPlacement {
 function shiftDynamicCollisionBox(collisionBox: SingleCollisionBox,
                                   textBoxScale: number,
                                   shiftX: number, shiftY: number,
-                                  offset: [number, number]) {
+                                  offset: [number, number],
+                                  angle: number) {
     const {x1, x2, y1, y2, anchorPointX, anchorPointY} = collisionBox;
-    // offset unit is ems, so we need to convert it to tile pixel units by mutilpying it by textBoxScale
+    const combinedOffset = new Point(
+        shiftX + offset[0] * textBoxScale,
+        shiftY + offset[1] * textBoxScale).rotate(angle);
+    // offset unit is ems, so we need to convert it to tile pixel units by mutiplying it by textBoxScale
     return {
-        x1: x1 + shiftX + offset[0] * textBoxScale,
-        y1: y1 + shiftY + offset[1] * textBoxScale,
-        x2: x2 + shiftX + offset[0] * textBoxScale,
-        y2: y2 + shiftY + offset[1] * textBoxScale,
+        x1: x1 + combinedOffset.x,
+        y1: y1 + combinedOffset.y,
+        x2: x2 + combinedOffset.x,
+        y2: y2 + combinedOffset.y,
         // symbol anchor point stays the same regardless of text-anchor
         anchorPointX,
         anchorPointY
@@ -356,12 +361,12 @@ export class Placement {
                         if (justifiedPlacedSymbol < 0) continue;
 
                         const {horizontalAlign, verticalAlign} = getAnchorAlignment(anchor);
-                        const shiftX = -horizontalAlign * (textBox.x2 - textBox.x1);
-                        const shiftY = -verticalAlign * (textBox.y2 - textBox. y1);
+                        const shiftX = -(horizontalAlign - 0.5) * (textBox.x2 - textBox.x1);
+                        const shiftY = -(verticalAlign - 0.5) * (textBox.y2 - textBox. y1);
                         const offset = dynamicTextOffset ? getDynamicOffset(anchor, dynamicTextOffset) : [0, 0];
 
                         if (collisionArrays.textBox) {
-                            shiftedCollisionBox = shiftDynamicCollisionBox(collisionArrays.textBox, textBoxScale, shiftX, shiftY, offset);
+                            shiftedCollisionBox = shiftDynamicCollisionBox(collisionArrays.textBox, textBoxScale, shiftX, shiftY, offset, this.transform.angle);
                             placedGlyphBoxes = this.collisionIndex.placeCollisionBox(shiftedCollisionBox,
                                     layout.get('text-allow-overlap'), textPixelRatio, posMatrix, collisionGroup.predicate);
                             placeText = placedGlyphBoxes.box.length > 0;

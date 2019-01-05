@@ -134,9 +134,9 @@ export function performSymbolLayout(bucket: SymbolBucket,
                 for (let i = 0; i < justifications.length; i++) {
                     const justification: TextJustify = justifications[i];
                     if (shapedTextOrientations.horizontal[justification]) continue;
-                    // If using dynamic-text-anchor for the layer, we use a top-left anchor for all shapings and apply
+                    // If using dynamic-text-anchor for the layer, we use a center anchor for all shapings and apply
                     // the offsets for the anchor in the placement step.
-                    const shaping = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, 'top-left', justification, spacingIfAllowed, textOffset, ONE_EM, WritingMode.horizontal);
+                    const shaping = shapeText(text, glyphMap, fontstack, maxWidth, lineHeight, 'center', justification, spacingIfAllowed, textOffset, ONE_EM, WritingMode.horizontal);
                     if (shaping) shapedTextOrientations.horizontal[justification] = shaping;
                 }
             } else {
