@@ -293,6 +293,8 @@ export class Placement {
 
         const collisionGroup = this.collisionGroups.get(bucket.sourceID);
 
+        const rotateWithMap = layout.get('text-rotation-alignment') === 'map';
+
         if (!bucket.collisionArrays && collisionBoxArray) {
             bucket.deserializeCollisionBoxes(collisionBoxArray);
         }
@@ -366,7 +368,9 @@ export class Placement {
                         const offset = dynamicTextOffset ? getDynamicOffset(anchor, dynamicTextOffset) : [0, 0];
 
                         if (collisionArrays.textBox) {
-                            shiftedCollisionBox = shiftDynamicCollisionBox(collisionArrays.textBox, textBoxScale, shiftX, shiftY, offset, this.transform.angle);
+                            shiftedCollisionBox = shiftDynamicCollisionBox(
+                                collisionArrays.textBox, textBoxScale, shiftX, shiftY, offset,
+                                rotateWithMap ? this.transform.angle : 0);
                             placedGlyphBoxes = this.collisionIndex.placeCollisionBox(shiftedCollisionBox,
                                     layout.get('text-allow-overlap'), textPixelRatio, posMatrix, collisionGroup.predicate);
                             placeText = placedGlyphBoxes.box.length > 0;
