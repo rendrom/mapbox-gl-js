@@ -177,9 +177,12 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
                                 new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize)
                                     .rotate(-painter.transform.angle));
                     } else {
-                        projectedAnchor = symbolProjection.project(
-                            new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix).point.add(
-                                new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize));
+                        const projected = symbolProjection.project(
+                            new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix);
+                        const perspectiveRatio = 0.5 + 0.5 * (painter.transform.cameraToCenterDistance / projected.signedDistanceFromCamera);
+                        projectedAnchor = projected.point.add(
+                                new Point(symbol.shiftX * renderTextSize * perspectiveRatio,
+                                          symbol.shiftY * renderTextSize * perspectiveRatio));
                     }
                     for (let g = 0; g < symbol.numGlyphs; g++) {
                         addDynamicAttributes(dynamicLayoutVertexArray, projectedAnchor, 0);
