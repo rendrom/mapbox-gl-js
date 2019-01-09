@@ -665,8 +665,8 @@ export class Placement {
                             const placedShift = Object.keys(dynamicOffsets).map(k => dynamicOffsets[k]).filter(s => s[0] !== undefined && s[0] !== -Infinity);
                             if (placedShift.length) {
                                 const shift = placedShift[0];
-                                shiftX = (shift[0] * textBoxScale) / Math.pow(2, this.transform.zoom - overscaledZ);
-                                shiftY = (shift[1] * textBoxScale) / Math.pow(2, this.transform.zoom - overscaledZ);
+                                shiftX = shift[0] * textBoxScale;
+                                shiftY = shift[1] * textBoxScale;
                             }
                         }
 

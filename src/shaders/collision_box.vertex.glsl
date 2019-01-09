@@ -19,8 +19,8 @@ void main() {
         0.0, // Prevents oversized near-field boxes in pitched/overzoomed tiles
         4.0);
 
-    gl_Position = u_matrix * vec4(a_pos + a_shift, 0.0, 1.0);
-    gl_Position.xy += a_extrude * u_extrude_scale * gl_Position.w * collision_perspective_ratio;
+    gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+    gl_Position.xy += (a_extrude + a_shift) * u_extrude_scale * gl_Position.w * collision_perspective_ratio;
 
     v_placed = a_placed.x;
     v_notUsed = a_placed.y;
