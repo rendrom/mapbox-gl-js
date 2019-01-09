@@ -212,7 +212,7 @@ export class Placement {
     retainedQueryData: {[number]: RetainedQueryData};
     collisionGroups: CollisionGroups;
 
-    constructor(transform: Transform, fadeDuration: number, crossSourceCollisions: boolean) {
+    constructor(transform: Transform, fadeDuration: number, crossSourceCollisions: boolean, prevPlacement: Placement) {
         this.transform = transform.clone();
         this.collisionIndex = new CollisionIndex(this.transform);
         this.placements = {};
@@ -223,6 +223,10 @@ export class Placement {
         this.fadeDuration = fadeDuration;
         this.retainedQueryData = {};
         this.collisionGroups = new CollisionGroups(crossSourceCollisions);
+        this.prevPlacement = prevPlacement;
+        if (prevPlacement) {
+            prevPlacement.prevPlacement = undefined;
+        }
     }
 
     placeLayerTile(styleLayer: StyleLayer, tile: Tile, showCollisionBoxes: boolean, seenCrossTileIDs: { [string | number]: boolean }) {
@@ -348,7 +352,41 @@ export class Placement {
                     const textBox = collisionArrays.textBox;
                     const textBoxScale = getTextboxScale(bucket.tilePixelRatio, layoutTextSize);
                     const dynamicAnchors = layout.get('dynamic-text-anchor');
-                    const anchors = dynamicAnchors[0] === "auto" ? AUTO_DYNAMIC_PLACEMENT : dynamicAnchors;
+                    const anchors = dynamicAnchors[0] === "auto" ? AUTO_DYNAMIC_PLACEMENT.slice() : dynamicAnchors.slice();
+                    if (this.prevPlacement && this.prevPlacement.dynamicOffsets[symbolInstance.crossTileID]) {
+                        const prevOffsets = this.prevPlacement.dynamicOffsets[symbolInstance.crossTileID];
+                        // TODO: This is a crazy way to look up whidh anchor we chose
+                        const prevShift = Object.keys(prevOffsets).map(k => prevOffsets[k]).filter(s => s[0] !== undefined && s[0] !== -Infinity);
+                        if (prevShift.length > 0) {
+                            let firstAnchor;
+                            if (prevShift[0][0] > 0) {
+                                if (prevShift[0][1] > 0) {
+                                    firstAnchor = "top-left";
+                                } else if (prevShift[0][1] === 0) {
+                                    firstAnchor = "left";
+                                } else {
+                                    firstAnchor = "bottom-left";
+                                }
+                            } else if (prevShift[0][0] === 0) {
+                                if (prevShift[0][1] > 0) {
+                                    firstAnchor = "top";
+                                } else if (prevShift[0][1] === 0) {
+                                    firstAnchor = "center";
+                                } else {
+                                    firstAnchor = "bottom";
+                                }
+                            } else {
+                                if (prevShift[0][1] > 0) {
+                                    firstAnchor = "top-right";
+                                } else if (prevShift[0][1] === 0) {
+                                    firstAnchor = "right";
+                                } else {
+                                    firstAnchor = "bottom-right";
+                                }
+                            }
+                            anchors.unshift(firstAnchor);
+                        }
+                    }
                     for (const anchor of anchors) {
                         // Skip center placement on auto mode if there is an icon for this feature
                         if (collisionArrays.iconBox && dynamicAnchors[0] === "auto" && anchor === "center") {

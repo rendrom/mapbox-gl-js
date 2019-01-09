@@ -1107,7 +1107,8 @@ class Style extends Evented {
         const forceFullPlacement = this._layerOrderChanged || fadeDuration === 0;
 
         if (forceFullPlacement || !this.pauseablePlacement || (this.pauseablePlacement.isDone() && !this.placement.stillRecent(browser.now()))) {
-            this.pauseablePlacement = new PauseablePlacement(transform, this._order, forceFullPlacement, showCollisionBoxes, fadeDuration, crossSourceCollisions);
+            const prevPlacement = this.pauseablePlacement ? this.pauseablePlacement.placement : undefined;
+            this.pauseablePlacement = new PauseablePlacement(transform, this._order, forceFullPlacement, showCollisionBoxes, fadeDuration, crossSourceCollisions, prevPlacement);
             this._layerOrderChanged = false;
         }
 
