@@ -16,6 +16,10 @@ import DepthMode from '../gl/depth_mode';
 import CullFaceMode from '../gl/cull_face_mode';
 import {addDynamicAttributes} from '../data/bucket/symbol_bucket';
 
+import { getAnchorAlignment } from '../symbol/shaping';
+import { getDynamicOffset } from '../symbol/placement';
+import { easeCubicInOut } from '../util/util';
+
 import {
     symbolIconUniformValues,
     symbolSDFUniformValues
@@ -46,7 +50,7 @@ type SymbolTileRenderState = {
     }
 };
 
-function drawSymbols(painter: Painter, sourceCache: SourceCache, layer: SymbolStyleLayer, coords: Array<OverscaledTileID>) {
+function drawSymbols(painter: Painter, sourceCache: SourceCache, layer: SymbolStyleLayer, coords: Array<OverscaledTileID>, dynamicOffsets: any) {
     if (painter.renderPass !== 'translucent') return;
 
     // Disable the stencil test so that labels aren't clipped to tile boundaries.
@@ -60,7 +64,7 @@ function drawSymbols(painter: Painter, sourceCache: SourceCache, layer: SymbolSt
             layer.layout.get('icon-rotation-alignment'),
             layer.layout.get('icon-pitch-alignment'),
             layer.layout.get('icon-keep-upright'),
-            stencilMode, colorMode
+            stencilMode, colorMode, dynamicOffsets
         );
     }
 
@@ -71,7 +75,7 @@ function drawSymbols(painter: Painter, sourceCache: SourceCache, layer: SymbolSt
             layer.layout.get('text-rotation-alignment'),
             layer.layout.get('text-pitch-alignment'),
             layer.layout.get('text-keep-upright'),
-            stencilMode, colorMode
+            stencilMode, colorMode, dynamicOffsets
         );
     }
 
@@ -80,8 +84,19 @@ function drawSymbols(painter: Painter, sourceCache: SourceCache, layer: SymbolSt
     }
 }
 
+function calculateDynamicShift(anchor, width, height, radialOffset, textBoxScale) {
+    const {horizontalAlign, verticalAlign} = getAnchorAlignment(anchor);
+    const shiftX = -(horizontalAlign - 0.5) * width;
+    const shiftY = -(verticalAlign - 0.5) * height;
+    const offset = radialOffset ? getDynamicOffset(anchor, radialOffset) : [0, 0];
+    return {
+        x: shiftX / textBoxScale + offset[0],
+        y: shiftY / textBoxScale + offset[1]
+    };
+}
+
 function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate, translateAnchor,
-    rotationAlignment, pitchAlignment, keepUpright, stencilMode, colorMode) {
+    rotationAlignment, pitchAlignment, keepUpright, stencilMode, colorMode, dynamicOffsets) {
 
     const context = painter.context;
     const gl = context.gl;
@@ -96,6 +111,8 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
     const rotateInShader = rotateWithMap && !pitchWithMap && !alongLine;
 
     const sortFeaturesByKey = layer.layout.get('symbol-sort-key').constantOr(1) !== undefined;
+
+    const t = easeCubicInOut(painter.symbolFadeChange);
 
     const depthMode = painter.depthModeForSublayer(0, DepthMode.ReadOnly);
 
@@ -155,11 +172,24 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
             dynamicLayoutVertexArray.clear();
             for (let s = 0; s < placedSymbols.length; s++) {
                 const symbol: any = placedSymbols.get(s);
-                if (symbol.hidden || symbol.shiftX === -Infinity) {
+                if (symbol.hidden) {
                     // These symbols are from a justification that is not being used, or a label that wasn't placed
                     // so we don't need to do the extra math to figure out what incremental shift to apply.
                     symbolProjection.hideGlyphs(symbol.numGlyphs, dynamicLayoutVertexArray);
                 } else  {
+                    const crossTileID = symbol.shiftY; // MWHAHAHAHAHA
+                    const dynamicOffset = dynamicOffsets[crossTileID];
+                    if (!dynamicOffset || !symbol.shiftX) {
+                        symbolProjection.hideGlyphs(symbol.numGlyphs, dynamicLayoutVertexArray);
+                        continue;
+                    }
+                    const shift = calculateDynamicShift(dynamicOffset.anchor, dynamicOffset.width, dynamicOffset.height, dynamicOffset.dynamicTextOffset, dynamicOffset.textBoxScale);
+                    if (dynamicOffset.prevAnchor && dynamicOffset.prevAnchor !== dynamicOffset.anchor) {
+                        const prevShift = calculateDynamicShift(dynamicOffset.prevAnchor, dynamicOffset.width, dynamicOffset.height, dynamicOffset.dynamicTextOffset, dynamicOffset.textBoxScale);
+                        shift.x = shift.x * t + prevShift.x * (1 - t);
+                        shift.y = shift.y * t + prevShift.y * (1 - t);
+                    }
+
                     // 24 is the magic number used to scale all sdfs – here we are basically calculating the textBoxScale for the
                     // label at the rendered size instead of the layout size we use for placement
                     const renderTextSize = symbolSize.evaluateSizeForFeature(bucket.textSizeData, size, symbol) / 24;
@@ -169,20 +199,20 @@ function drawLayerSymbols(painter, sourceCache, layer, coords, isText, translate
                     if (pitchWithMap) {
                         projectedAnchor = symbolProjection.project(
                             new Point(symbol.anchorX, symbol.anchorY).add(
-                                new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize)
+                                new Point(shift.x * renderTextSize, shift.y * renderTextSize)
                                 ), labelPlaneMatrix).point;
                     } else if (rotateWithMap) {
                         projectedAnchor = symbolProjection.project(
                             new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix).point.add(
-                                new Point(symbol.shiftX * renderTextSize, symbol.shiftY * renderTextSize)
+                                new Point(shift.x * renderTextSize, shift.y * renderTextSize)
                                     .rotate(-painter.transform.angle));
                     } else {
                         const projected = symbolProjection.project(
                             new Point(symbol.anchorX, symbol.anchorY), labelPlaneMatrix);
                         const perspectiveRatio = 0.5 + 0.5 * (painter.transform.cameraToCenterDistance / projected.signedDistanceFromCamera);
                         projectedAnchor = projected.point.add(
-                                new Point(symbol.shiftX * renderTextSize * perspectiveRatio,
-                                          symbol.shiftY * renderTextSize * perspectiveRatio));
+                                new Point(shift.x * renderTextSize * perspectiveRatio,
+                                          shift.y * renderTextSize * perspectiveRatio));
                     }
                     for (let g = 0; g < symbol.numGlyphs; g++) {
                         addDynamicAttributes(dynamicLayoutVertexArray, projectedAnchor, 0);
